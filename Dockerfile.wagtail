@@ -1,0 +1,60 @@
+FROM python:3.13
+LABEL maintainer="Lucy Patton <lucy.patton.368@gmail.com>"
+
+# 1. Create a non-root "wagtail" user for security.
+RUN useradd wagtail
+
+# 2. Expose the container's HTTP port.
+EXPOSE 8000
+
+# 3. Set environment variables.
+#    - PYTHONUNBUFFERED ensures Python logs appear immediately.
+#    - PORT is used by Gunicorn (and should match EXPOSE).
+ENV PYTHONUNBUFFERED=1 \
+    PORT=8000
+
+# 4. Install system packages needed by Wagtail and Django.
+RUN apt-get update --yes --quiet && apt-get install --yes --quiet --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    libmariadb-dev \
+    libjpeg62-turbo-dev \
+    zlib1g-dev \
+    libwebp-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+# 5. Install Gunicorn (the app server) via pip.
+RUN pip install "gunicorn==20.0.4"
+
+# 6. Clone the Base Wagtail repository
+WORKDIR /usr/src/app
+RUN git clone --branch main https://github.com/TripleLK/wagtail-docker-base wagtail_base  # <== Repo 1 clone
+
+# 7. Change to the cloned repository directory and install its Python dependencies.
+WORKDIR /usr/src/app/wagtail_base
+RUN pip install --upgrade pip && pip install -r requirements.txt  # <== uses wagtail_base/requirements.txt
+
+# 8. Set up an environment variable to designate the per–project shared volume.
+ENV SHARED_DIR=/usr/src/app/wagtail_base/apps/shared
+
+# 9. Declare that directory as a Docker volume (i.e. it is shared with the host computer)
+VOLUME ["/usr/src/app/wagtail_base/apps/shared"]
+
+# 10. Return to a common working directory.
+WORKDIR /usr/src/app
+
+# 11. Ensure the /usr/src/app directory is owned by the "wagtail" user for write permissions.
+RUN chown -R wagtail:wagtail /usr/src/app
+
+# 12. Switch to the "wagtail" user.
+USER wagtail
+
+# 13. Collect static files from your Wagtail project.
+WORKDIR /usr/src/app/wagtail_base
+RUN python manage.py collectstatic --noinput --clear   # <== ensure manage.py is in wagtail_base
+
+# 14. Final runtime command: Migrate the database, run your create_admin.py to create/update the admin user,
+#     and then start Gunicorn to serve the app.
+CMD python manage.py migrate --noinput && \
+    python /usr/src/app/wagtail_base/create_admin.py && \
+    gunicorn lllk_wagtail_base.wsgi:application --bind 0.0.0.0:$PORT   # <== verify your WSGI module path
