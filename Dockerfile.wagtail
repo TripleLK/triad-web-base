@@ -28,17 +28,17 @@ RUN pip install "gunicorn==20.0.4"
 
 # 6. Clone the Base Wagtail repository
 WORKDIR /usr/src/app
-RUN git clone --branch main https://github.com/TripleLK/wagtail-docker-base wagtail_base  # <== Repo 1 clone
+RUN git clone --branch main https://github.com/TripleLK/triad-docker-base triad_base  # <== Repo 1 clone
 
 # 7. Change to the cloned repository directory and install its Python dependencies.
-WORKDIR /usr/src/app/wagtail_base
-RUN pip install --upgrade pip && pip install -r requirements.txt  # <== uses wagtail_base/requirements.txt
+WORKDIR /usr/src/app/triad_base
+RUN pip install --upgrade pip && pip install -r requirements.txt  # <== uses triad_base/requirements.txt
 
 # 8. Set up an environment variable to designate the per–project shared volume.
-ENV SHARED_DIR=/usr/src/app/wagtail_base/apps/shared
+ENV SHARED_DIR=/usr/src/app/triad_base/apps/shared
 
 # 9. Declare that directory as a Docker volume (i.e. it is shared with the host computer)
-VOLUME ["/usr/src/app/wagtail_base/apps/shared"]
+VOLUME ["/usr/src/app/triad_base/apps/shared"]
 
 # 10. Return to a common working directory.
 WORKDIR /usr/src/app
@@ -50,11 +50,11 @@ RUN chown -R wagtail:wagtail /usr/src/app
 USER wagtail
 
 # 13. Collect static files from your Wagtail project.
-WORKDIR /usr/src/app/wagtail_base
-RUN python manage.py collectstatic --noinput --clear   # <== ensure manage.py is in wagtail_base
+WORKDIR /usr/src/app/triad_base
+RUN python manage.py collectstatic --noinput --clear   # <== ensure manage.py is in triad_base
 
 # 14. Final runtime command: Migrate the database, run your create_admin.py to create/update the admin user,
 #     and then start Gunicorn to serve the app.
 CMD python manage.py migrate --noinput && \
-    python /usr/src/app/wagtail_base/create_admin.py && \
+    python /usr/src/app/triad_base/create_admin.py && \
     gunicorn lllk_wagtail_base.wsgi:application --bind 0.0.0.0:$PORT   # <== verify your WSGI module path
